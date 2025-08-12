@@ -1,8 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { neon } from "@neondatabase/serverless"
+import { sql } from "@/lib/db"
 import crypto from "crypto"
-
-const sql = neon(process.env.DATABASE_URL!)
 
 let dbInitialized = false
 
