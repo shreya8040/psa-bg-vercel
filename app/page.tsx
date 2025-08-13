@@ -16,7 +16,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3">
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 px-4 py-3 shadow-sm">
         <div className="flex items-center justify-between">
           <h1 className="font-bold text-gray-900 text-4xl" style={{ fontFamily: "var(--font-lexend)" }}>
             PSA Bengaluru
@@ -24,8 +24,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Tab Navigation */}
-      <nav className="bg-white border-b border-gray-200 px-4">
+      <nav className="sticky top-[73px] z-40 bg-white border-b border-gray-200 px-4 shadow-sm">
         <div className="flex space-x-1">
           <Button
             variant={activeTab === "feed" ? "default" : "ghost"}
@@ -65,7 +64,7 @@ export default function HomePage() {
         </div>
       </nav>
 
-      <main className="px-4 py-6 space-y-6">
+      <main className="px-4 py-6 space-y-6 pt-6">
         <LocationPermission
           onLocationGranted={(location) => {
             setUserLocation({ lat: location.lat, lng: location.lng })

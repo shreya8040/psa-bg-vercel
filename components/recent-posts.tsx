@@ -33,6 +33,7 @@ export function RecentPosts() {
   const [submittingUpdate, setSubmittingUpdate] = useState(false)
   const [expandedUpdates, setExpandedUpdates] = useState<Set<number>>(new Set())
   const [userSession, setUserSession] = useState<string>("")
+  const [votingStates, setVotingStates] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const generateUserSession = () => {
@@ -42,13 +43,13 @@ export function RecentPosts() {
         localStorage.setItem("psa-user-session", sessionId)
       }
       setUserSession(sessionId)
+      fetchPostsWithSession(sessionId)
     }
 
     generateUserSession()
-    fetchPosts()
   }, [])
 
-  const fetchPosts = async () => {
+  const fetchPostsWithSession = async (sessionId: string) => {
     try {
       setError(null)
       const response = await fetch("/api/posts")
@@ -66,7 +67,7 @@ export function RecentPosts() {
                       try {
                         const votesResponse = await fetch(`/api/posts/${post.id}/updates/${update.id}/votes`, {
                           headers: {
-                            "X-User-Session": userSession,
+                            "X-User-Session": sessionId,
                           },
                         })
                         if (votesResponse.ok) {
@@ -101,6 +102,12 @@ export function RecentPosts() {
       setPosts([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchPosts = async () => {
+    if (userSession) {
+      await fetchPostsWithSession(userSession)
     }
   }
 
@@ -210,7 +217,9 @@ export function RecentPosts() {
   }
 
   const handleVote = async (postId: number, updateId: number, voteType: "upvote" | "downvote") => {
-    // Update UI immediately for instant feedback
+    const voteKey = `${postId}-${updateId}-${voteType}`
+    setVotingStates((prev) => new Set(prev).add(voteKey))
+
     updateVoteOptimistically(postId, updateId, voteType)
 
     try {
@@ -224,7 +233,6 @@ export function RecentPosts() {
       })
 
       if (response.ok) {
-        // Get the actual vote state from server to sync
         const voteData = await response.json()
         setPosts((prevPosts) =>
           prevPosts.map((post) => {
@@ -243,14 +251,20 @@ export function RecentPosts() {
           }),
         )
       } else {
-        // Revert optimistic update on failure
         fetchPosts()
         console.error("Failed to vote")
       }
     } catch (error) {
-      // Revert optimistic update on error
       fetchPosts()
       console.error("Error voting:", error)
+    } finally {
+      setTimeout(() => {
+        setVotingStates((prev) => {
+          const newSet = new Set(prev)
+          newSet.delete(voteKey)
+          return newSet
+        })
+      }, 300)
     }
   }
 
@@ -404,23 +418,33 @@ export function RecentPosts() {
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => handleVote(post.id, update.id, "upvote")}
-                                className={`flex items-center gap-1 px-3 py-1 rounded text-sm font-medium ${
+                                className={`flex items-center gap-1 px-3 py-1 rounded text-sm font-medium transition-all duration-200 transform hover:scale-105 active:scale-95 ${
                                   update.userVote === "upvote"
-                                    ? "bg-green-500 text-white"
-                                    : "bg-gray-200 text-gray-600 hover:bg-green-100"
+                                    ? "bg-green-500 text-white shadow-md"
+                                    : "bg-gray-200 text-gray-600 hover:bg-green-100 hover:text-green-700"
+                                } ${
+                                  votingStates.has(`${post.id}-${update.id}-upvote`) ? "animate-pulse scale-110" : ""
                                 }`}
+                                disabled={votingStates.has(`${post.id}-${update.id}-upvote`)}
                               >
-                                ↑ {update.upvotes || 0}
+                                <span className="transition-transform duration-200">↑</span>
+                                <span className="font-semibold transition-all duration-300">{update.upvotes || 0}</span>
                               </button>
                               <button
                                 onClick={() => handleVote(post.id, update.id, "downvote")}
-                                className={`flex items-center gap-1 px-3 py-1 rounded text-sm font-medium ${
+                                className={`flex items-center gap-1 px-3 py-1 rounded text-sm font-medium transition-all duration-200 transform hover:scale-105 active:scale-95 ${
                                   update.userVote === "downvote"
-                                    ? "bg-red-500 text-white"
-                                    : "bg-gray-200 text-gray-600 hover:bg-red-100"
+                                    ? "bg-red-500 text-white shadow-md"
+                                    : "bg-gray-200 text-gray-600 hover:bg-red-100 hover:text-red-700"
+                                } ${
+                                  votingStates.has(`${post.id}-${update.id}-downvote`) ? "animate-pulse scale-110" : ""
                                 }`}
+                                disabled={votingStates.has(`${post.id}-${update.id}-downvote`)}
                               >
-                                ↓ {update.downvotes || 0}
+                                <span className="transition-transform duration-200">↓</span>
+                                <span className="font-semibold transition-all duration-300">
+                                  {update.downvotes || 0}
+                                </span>
                               </button>
                             </div>
                           </div>
