@@ -19,6 +19,9 @@ interface Update {
   id: number
   content: string
   created_at: string
+  userVote?: "upvote" | "downvote" | null
+  upvotes?: number
+  downvotes?: number
 }
 
 export function RecentPosts() {
@@ -29,8 +32,19 @@ export function RecentPosts() {
   const [updateContent, setUpdateContent] = useState("")
   const [submittingUpdate, setSubmittingUpdate] = useState(false)
   const [expandedUpdates, setExpandedUpdates] = useState<Set<number>>(new Set())
+  const [userSession, setUserSession] = useState<string>("")
 
   useEffect(() => {
+    const generateUserSession = () => {
+      let sessionId = localStorage.getItem("psa-user-session")
+      if (!sessionId) {
+        sessionId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        localStorage.setItem("psa-user-session", sessionId)
+      }
+      setUserSession(sessionId)
+    }
+
+    generateUserSession()
     fetchPosts()
   }, [])
 
@@ -47,7 +61,25 @@ export function RecentPosts() {
                 const updatesResponse = await fetch(`/api/posts/${post.id}/updates`)
                 if (updatesResponse.ok) {
                   const updates = await updatesResponse.json()
-                  return { ...post, updates }
+                  const updatesWithVotes = await Promise.all(
+                    updates.map(async (update: Update) => {
+                      try {
+                        const votesResponse = await fetch(`/api/posts/${post.id}/updates/${update.id}/votes`, {
+                          headers: {
+                            "X-User-Session": userSession,
+                          },
+                        })
+                        if (votesResponse.ok) {
+                          const voteData = await votesResponse.json()
+                          return { ...update, ...voteData }
+                        }
+                      } catch (error) {
+                        console.error(`Failed to fetch votes for update ${update.id}:`, error)
+                      }
+                      return { ...update, userVote: null, upvotes: 0, downvotes: 0 }
+                    }),
+                  )
+                  return { ...post, updates: updatesWithVotes }
                 }
               } catch (error) {
                 console.error(`Failed to fetch updates for post ${post.id}:`, error)
@@ -122,6 +154,104 @@ export function RecentPosts() {
       newExpanded.add(postId)
     }
     setExpandedUpdates(newExpanded)
+  }
+
+  const updateVoteOptimistically = (postId: number, updateId: number, voteType: "upvote" | "downvote") => {
+    setPosts((prevPosts) =>
+      prevPosts.map((post) => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            updates: post.updates?.map((update) => {
+              if (update.id === updateId) {
+                const currentUserVote = update.userVote
+                let newUserVote: "upvote" | "downvote" | null = voteType
+                let newUpvotes = update.upvotes || 0
+                let newDownvotes = update.downvotes || 0
+
+                // Handle vote toggle logic
+                if (currentUserVote === voteType) {
+                  // User is toggling off their existing vote
+                  newUserVote = null
+                  if (voteType === "upvote") {
+                    newUpvotes = Math.max(0, newUpvotes - 1)
+                  } else {
+                    newDownvotes = Math.max(0, newDownvotes - 1)
+                  }
+                } else {
+                  // User is changing vote or voting for first time
+                  if (currentUserVote === "upvote") {
+                    newUpvotes = Math.max(0, newUpvotes - 1)
+                  } else if (currentUserVote === "downvote") {
+                    newDownvotes = Math.max(0, newDownvotes - 1)
+                  }
+
+                  if (voteType === "upvote") {
+                    newUpvotes += 1
+                  } else {
+                    newDownvotes += 1
+                  }
+                }
+
+                return {
+                  ...update,
+                  userVote: newUserVote,
+                  upvotes: newUpvotes,
+                  downvotes: newDownvotes,
+                }
+              }
+              return update
+            }),
+          }
+        }
+        return post
+      }),
+    )
+  }
+
+  const handleVote = async (postId: number, updateId: number, voteType: "upvote" | "downvote") => {
+    // Update UI immediately for instant feedback
+    updateVoteOptimistically(postId, updateId, voteType)
+
+    try {
+      const response = await fetch(`/api/posts/${postId}/updates/${updateId}/vote`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-User-Session": userSession,
+        },
+        body: JSON.stringify({ voteType }),
+      })
+
+      if (response.ok) {
+        // Get the actual vote state from server to sync
+        const voteData = await response.json()
+        setPosts((prevPosts) =>
+          prevPosts.map((post) => {
+            if (post.id === postId) {
+              return {
+                ...post,
+                updates: post.updates?.map((update) => {
+                  if (update.id === updateId) {
+                    return { ...update, ...voteData }
+                  }
+                  return update
+                }),
+              }
+            }
+            return post
+          }),
+        )
+      } else {
+        // Revert optimistic update on failure
+        fetchPosts()
+        console.error("Failed to vote")
+      }
+    } catch (error) {
+      // Revert optimistic update on error
+      fetchPosts()
+      console.error("Error voting:", error)
+    }
   }
 
   if (loading) {
@@ -268,8 +398,32 @@ export function RecentPosts() {
                     <div className="space-y-3">
                       {post.updates.map((update) => (
                         <div key={update.id} className="bg-gray-50 p-3 rounded-md">
-                          <p className="text-sm text-gray-800 mb-1">{update.content}</p>
-                          <p className="text-xs text-gray-500">{formatTime(update.created_at)}</p>
+                          <p className="text-sm text-gray-800 mb-2">{update.content}</p>
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-gray-500">{formatTime(update.created_at)}</p>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleVote(post.id, update.id, "upvote")}
+                                className={`flex items-center gap-1 px-3 py-1 rounded text-sm font-medium ${
+                                  update.userVote === "upvote"
+                                    ? "bg-green-500 text-white"
+                                    : "bg-gray-200 text-gray-600 hover:bg-green-100"
+                                }`}
+                              >
+                                ↑ {update.upvotes || 0}
+                              </button>
+                              <button
+                                onClick={() => handleVote(post.id, update.id, "downvote")}
+                                className={`flex items-center gap-1 px-3 py-1 rounded text-sm font-medium ${
+                                  update.userVote === "downvote"
+                                    ? "bg-red-500 text-white"
+                                    : "bg-gray-200 text-gray-600 hover:bg-red-100"
+                                }`}
+                              >
+                                ↓ {update.downvotes || 0}
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
