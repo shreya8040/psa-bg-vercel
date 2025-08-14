@@ -38,7 +38,14 @@ export function SearchInterface({ userLocation }: SearchInterfaceProps) {
   const { toast } = useToast()
 
   useEffect(() => {
-    fetchPopularHashtags()
+    const initializeComponent = async () => {
+      try {
+        await fetchPopularHashtags()
+      } catch (error) {
+        console.error("Failed to initialize search component:", error)
+      }
+    }
+    initializeComponent()
   }, [])
 
   const fetchPopularHashtags = async () => {
@@ -46,16 +53,23 @@ export function SearchInterface({ userLocation }: SearchInterfaceProps) {
       const response = await fetch("/api/hashtags/popular")
       if (response.ok) {
         const data = await response.json()
-        setPopularHashtags(data)
+        setPopularHashtags(Array.isArray(data) ? data : [])
+      } else {
+        console.warn("Failed to fetch popular hashtags:", response.status)
       }
     } catch (error) {
       console.error("Failed to fetch popular hashtags:", error)
+      setPopularHashtags([])
     }
   }
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!searchQuery.trim() && activeFilters.length === 0) {
+
+    const hasQuery = searchQuery && searchQuery.trim().length > 0
+    const hasFilters = activeFilters && activeFilters.length > 0
+
+    if (!hasQuery && !hasFilters) {
       toast({
         title: "Search required",
         description: "Please enter a search term or select a hashtag.",
@@ -69,21 +83,40 @@ export function SearchInterface({ userLocation }: SearchInterfaceProps) {
 
     try {
       const params = new URLSearchParams()
-      if (searchQuery.trim()) params.append("q", searchQuery.trim())
-      if (activeFilters.length > 0) params.append("hashtags", activeFilters.join(","))
-      if (userLocation) {
+
+      if (hasQuery) {
+        params.append("q", searchQuery.trim())
+      }
+
+      if (hasFilters) {
+        params.append("hashtags", activeFilters.join(","))
+      }
+
+      if (userLocation && typeof userLocation.lat === "number" && typeof userLocation.lng === "number") {
         params.append("lat", userLocation.lat.toString())
         params.append("lng", userLocation.lng.toString())
       }
 
-      const response = await fetch(`/api/posts/search?${params}`)
+      const url = `/api/posts/search?${params.toString()}`
+      console.log("Searching with URL:", url)
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
       if (response.ok) {
         const data = await response.json()
-        setSearchResults(data)
+        setSearchResults(Array.isArray(data) ? data : [])
       } else {
-        throw new Error("Search failed")
+        const errorText = await response.text()
+        console.error("Search API error:", response.status, errorText)
+        throw new Error(`Search failed: ${response.status}`)
       }
     } catch (error) {
+      console.error("Search error:", error)
       toast({
         title: "Search failed",
         description: "Could not search posts. Please try again.",
@@ -95,7 +128,7 @@ export function SearchInterface({ userLocation }: SearchInterfaceProps) {
   }
 
   const addHashtagFilter = (hashtag: string) => {
-    if (!activeFilters.includes(hashtag)) {
+    if (hashtag && typeof hashtag === "string" && !activeFilters.includes(hashtag)) {
       setActiveFilters([...activeFilters, hashtag])
     }
   }
@@ -112,15 +145,20 @@ export function SearchInterface({ userLocation }: SearchInterfaceProps) {
   }
 
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
+    try {
+      const date = new Date(dateString)
+      const now = new Date()
+      const diffMs = now.getTime() - date.getTime()
+      const diffMins = Math.floor(diffMs / 60000)
 
-    if (diffMins < 1) return "Just now"
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`
-    return `${Math.floor(diffMins / 1440)}d ago`
+      if (diffMins < 1) return "Just now"
+      if (diffMins < 60) return `${diffMins}m ago`
+      if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`
+      return `${Math.floor(diffMins / 1440)}d ago`
+    } catch (error) {
+      console.error("Error formatting time:", error)
+      return "Unknown time"
+    }
   }
 
   return (
