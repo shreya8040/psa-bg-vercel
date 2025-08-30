@@ -37,6 +37,51 @@ export function SearchInterface({ userLocation }: SearchInterfaceProps) {
   const [hasSearched, setHasSearched] = useState(false)
   const { toast } = useToast()
 
+  const safeToast = (opts: { title: string; description?: string; variant?: "default" | "destructive" }) => {
+    try {
+      if (typeof toast === "function") toast(opts)
+    } catch (err) {
+      console.warn("[v0] toast unavailable:", err)
+    }
+  }
+
+  const fetchWithSafety = async (url: string, init?: RequestInit, timeoutMs = 10000) => {
+    try {
+      const controller = new AbortController()
+      const t = setTimeout(() => controller.abort(), timeoutMs)
+
+      // add cache buster to avoid PWA cached responses
+      const ts = Date.now().toString()
+      const urlObj = new URL(url, typeof window !== "undefined" ? window.location.origin : "http://localhost")
+      urlObj.searchParams.set("__ts", ts)
+
+      const res = await fetch(urlObj.toString(), {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+          Pragma: "no-cache",
+          ...(init?.headers || {}),
+        },
+        signal: controller.signal,
+        ...init,
+      })
+      clearTimeout(t)
+
+      // Try JSON first; if it fails, fall back to text
+      let data: any = null
+      const text = await res.text()
+      try {
+        data = text ? JSON.parse(text) : null
+      } catch {
+        data = text
+      }
+      return { ok: res.ok, status: res.status, data }
+    } catch (error) {
+      console.error("[v0] fetchWithSafety error:", error)
+      return { ok: false, status: 0, data: null as any }
+    }
+  }
+
   useEffect(() => {
     const initializeComponent = async () => {
       try {
@@ -50,12 +95,12 @@ export function SearchInterface({ userLocation }: SearchInterfaceProps) {
 
   const fetchPopularHashtags = async () => {
     try {
-      const response = await fetch("/api/hashtags/popular")
-      if (response.ok) {
-        const data = await response.json()
+      const { ok, data, status } = await fetchWithSafety("/api/hashtags/popular", { method: "GET" })
+      if (ok) {
         setPopularHashtags(Array.isArray(data) ? data : [])
       } else {
-        console.warn("Failed to fetch popular hashtags:", response.status)
+        console.warn("Failed to fetch popular hashtags:", status)
+        setPopularHashtags([])
       }
     } catch (error) {
       console.error("Failed to fetch popular hashtags:", error)
@@ -70,7 +115,7 @@ export function SearchInterface({ userLocation }: SearchInterfaceProps) {
     const hasFilters = activeFilters && activeFilters.length > 0
 
     if (!hasQuery && !hasFilters) {
-      toast({
+      safeToast({
         title: "Search required",
         description: "Please enter a search term or select a hashtag.",
         variant: "destructive",
@@ -100,24 +145,18 @@ export function SearchInterface({ userLocation }: SearchInterfaceProps) {
       const url = `/api/posts/search?${params.toString()}`
       console.log("Searching with URL:", url)
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setSearchResults(Array.isArray(data) ? data : [])
+      const { ok, data, status } = await fetchWithSafety(url, { method: "GET" })
+      if (ok && Array.isArray(data)) {
+        setSearchResults(data)
+      } else if (ok && data && typeof data === "object" && Array.isArray((data as any).results)) {
+        setSearchResults((data as any).results)
       } else {
-        const errorText = await response.text()
-        console.error("Search API error:", response.status, errorText)
-        throw new Error(`Search failed: ${response.status}`)
+        console.error("Search API error:", status, data)
+        throw new Error(`Search failed: ${status}`)
       }
     } catch (error) {
       console.error("Search error:", error)
-      toast({
+      safeToast({
         title: "Search failed",
         description: "Could not search posts. Please try again.",
         variant: "destructive",
