@@ -9,7 +9,10 @@ _To build an app that can help inform users who plan to transit through the city
 ● Iterated over the code multiple times to fix the logic
 ● Tweaked the default UI for better user flow and ease of use
 
-`UI:`
+
+`Hosted on:` https://psa-bengaluru.vercel.app/
+
+`UI:` (Desktop)
 
 <img width="600" height="300" alt="{8CF4D158-B7F5-4817-9111-D0A6EE841D35}" src="https://github.com/user-attachments/assets/c44f50b4-73fd-497a-9d68-f6109167cfea" />
 
