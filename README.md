@@ -6,7 +6,9 @@ _To build an app that can help inform users who plan to transit through the city
 
 
 ● Vibe coded the app using v0 agent
+
 ● Iterated over the code multiple times to fix the logic
+
 ● Tweaked the default UI for better user flow and ease of use
 
 
