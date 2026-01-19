@@ -12,7 +12,9 @@ _To build an app that can help inform users who plan to transit through the city
 ● Tweaked the default UI for better user flow and ease of use
 
 
+
 `Hosted on:` https://psa-bengaluru.vercel.app/
+
 
 `UI:` (Desktop)
 
