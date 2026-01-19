@@ -1,30 +1,16 @@
-# PSA App Development
+**Project type:** `Personal`
 
-*Automatically synced with your [v0.app](https://v0.app) deployments*
+**Goal:**
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/shreyas-projects-e5eef1ed/v0-psa-app-development)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/projects/sd2OUTJu6K3)
+_To build an app that can help inform users who plan to transit through the city/are in transit about potential delays due to issues like road blocks/repairs/major unexpected traffoc jams that could cause hiccups in the transit_
 
-## Overview
 
-This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
+● Vibe coded the app using v0 agent
+● Iterated over the code multiple times to fix the logic
+● Tweaked the default UI for better user flow and ease of use
 
-## Deployment
+`UI:`
 
-Your project is live at:
+<img width="600" height="300" alt="{8CF4D158-B7F5-4817-9111-D0A6EE841D35}" src="https://github.com/user-attachments/assets/c44f50b4-73fd-497a-9d68-f6109167cfea" />
 
-**[https://vercel.com/shreyas-projects-e5eef1ed/v0-psa-app-development](https://vercel.com/shreyas-projects-e5eef1ed/v0-psa-app-development)**
 
-## Build your app
-
-Continue building your app on:
-
-**[https://v0.app/chat/projects/sd2OUTJu6K3](https://v0.app/chat/projects/sd2OUTJu6K3)**
-
-## How It Works
-
-1. Create and modify your project using [v0.app](https://v0.app)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
